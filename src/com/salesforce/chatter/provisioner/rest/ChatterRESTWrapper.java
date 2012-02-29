@@ -44,6 +44,7 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.utils.URIUtils;
 import org.apache.http.client.utils.URLEncodedUtils;
+import org.apache.http.entity.StringEntity;
 import org.apache.http.entity.mime.HttpMultipartMode;
 import org.apache.http.entity.mime.MultipartEntity;
 import org.apache.http.entity.mime.content.FileBody;
@@ -92,7 +93,7 @@ public class ChatterRESTWrapper {
 		for (ChatterUser chatterUserFileUpload : userIdFileMap.values()) {//TODO add null check
 			userId = chatterUserFileUpload.getUserId() ;
 			if (!StringUtils.isEmpty(userId)) {
-				chattFileUploadRESTURL = StringUtils.replace(getChatterRESTURL(ChatterRESTUrl.USER_PHOTO), userIDReplaceToken, chatterUserFileUpload.getUserId()) ;
+				chattFileUploadRESTURL = StringUtils.replace(getChatterRESTURL(ChatterRESTUrl.CHATTER_USER_PHOTO), userIDReplaceToken, chatterUserFileUpload.getUserId()) ;
 				httppost = new HttpPost(chattFileUploadRESTURL);
 				reqEntity = new MultipartEntity(
 						HttpMultipartMode.BROWSER_COMPATIBLE);
@@ -222,6 +223,50 @@ public class ChatterRESTWrapper {
 		return groupIdFileMap;
 	}
 	
+	public void processUserUpdates (String csvFilePath) throws ClientProtocolException, IOException, URISyntaxException {
+		Map<String, ChatterUser> chatterUserUpdatesMap = retrieveIdsForUserUpdatesFromCSV(csvFilePath) ;
+		PropertyManager propMgr = PropertyManager.getInstance() ;
+
+		String userIDReplaceToken = propMgr.getStringProperty("user_id_placeholder");
+		
+		HttpClient httpclient = new DefaultHttpClient();
+		HttpPost httppost ;
+		StringEntity entity ;
+		String chatterRESTURL;	
+		String userId ;
+
+		for (ChatterUser user : chatterUserUpdatesMap.values()) {//TODO add null check
+			userId = user.getUserId() ;
+			if (!StringUtils.isEmpty(userId)) {
+				chatterRESTURL = StringUtils.replace(getChatterRESTURL(ChatterRESTUrl.USER), userIDReplaceToken, user.getUserId()) ;
+
+				Map<String, String> userFieldUpdatesMap = new HashMap<String, String>();
+				userFieldUpdatesMap.put("aboutMe", user.getAboutMe());
+				
+				String jsonString = JSONUtil.buildJSONString(userFieldUpdatesMap);
+				
+				entity = new StringEntity(jsonString);
+				entity.setContentType("application/json");
+				
+				//As per documentation for Chatter REST API, need to append "_HttpMethod=Patch" to the REST URL since Apache Httpcomponents project doesn't support PACTH
+				httppost = new HttpPost(chatterRESTURL+"?_HttpMethod=PATCH");
+				httppost.setEntity(entity);
+				httppost.setHeader("Authorization", "OAuth " + ChatterRESTOAuthTokenStore.getAccessToken());
+				HttpResponse response = httpclient.execute(httppost);
+				HttpEntity resEntity = response.getEntity();
+	
+				if (resEntity != null) {
+					String page = EntityUtils.toString(resEntity);
+					//TODO Add logging
+					System.out.println("PAGE :" + page);
+				}
+			} else {
+				//TODO Add logging
+				System.out.println("User Not Found:" + user.getUserName());
+			}
+		}		
+	}
+	
 	public void processGroupMembership (OperationType operationType, String csvFilePath) throws ClientProtocolException, IOException, URISyntaxException {
 		Map<String, List<ChatterUser>> chatterGroupMembersMap = retrieveIdsFromCSV(operationType, csvFilePath) ;
 		
@@ -328,6 +373,19 @@ public class ChatterRESTWrapper {
 		return chatterGroupMembersMap;
 	}
 	
+	private Map<String, ChatterUser> retrieveIdsForUserUpdatesFromCSV(String csvFilePath) {
+		Map<String, ChatterUser> chatterUserUpdatesMap = CSVUtil.getChatterUserUpdatesFromCSV(csvFilePath);
+		try {
+			retrieveUserIdsForUserProfileUpdatesFromList(chatterUserUpdatesMap.values()); 
+
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		//TODO get UserIds
+		return chatterUserUpdatesMap;
+	}	
+	
 	private void retrieveGroupIdsFromMapKeys(Map<String, List<ChatterUser>> chatterGroupMembersMap)
 			throws ClientProtocolException,	IOException, URISyntaxException{
 		PropertyManager propMgr = PropertyManager.getInstance() ;
@@ -428,6 +486,73 @@ public class ChatterRESTWrapper {
 		}
 	}
 	
+	private void retrieveUserIdsForUserProfileUpdatesFromList(Collection<ChatterUser> collection) throws ClientProtocolException, IOException, URISyntaxException {
+		PropertyManager propMgr = PropertyManager.getInstance() ;
+		StringBuilder query ;
+		Map<String, ChatterUser> userMap = new HashMap<String, ChatterUser>();
+		if(collection != null && collection.size() > 0) {
+			List<ChatterUser> chatterUserList = new ArrayList<ChatterUser>(collection) ;
+			int batchSize = propMgr.getIntProperty("batch_size");
+			int remainer = chatterUserList.size() % batchSize ;
+			int numberOfBatches = chatterUserList.size() / batchSize ;
+			if(remainer > 0) 
+					numberOfBatches += 1;
+			
+			int fromIndex = 0;
+			int toIndex = batchSize - 1;
+			List<ChatterUser> subList ;
+			
+			//Batch in groups of 1000
+			for (int i=0; i<numberOfBatches; i++) {
+				if (numberOfBatches > 1) {
+					subList =  chatterUserList.subList(fromIndex, toIndex);
+				} else  {
+					subList = chatterUserList;
+				}
+			
+				query = new StringBuilder();
+				query.append(propMgr.getStringProperty("user_id_query"));
+				query.append("(");
+				ChatterUser chatterUser;
+				boolean userAddedToQuery = false;
+				for(int j = 0; j < subList.size(); j++) {
+					chatterUser = subList.get(j);
+					if(chatterUserLookup.containsKey(chatterUser.getUserName())) {
+						chatterUser.setUserId(chatterUserLookup.get(chatterUser.getUserName()).getUserId() );
+						userMap.put(chatterUser.getUserName(), chatterUser);
+					} else {
+						if(j > 0 && userAddedToQuery) {
+							query.append(", ");
+						}
+						query.append("'" + chatterUser.getUserName() + "'");
+						userMap.put(chatterUser.getUserName(), chatterUser);
+						if(!userAddedToQuery) {
+							userAddedToQuery = true;
+						}
+					}
+				}
+				query.append(")");
+				if(userAddedToQuery) {
+					String restJsonResponse = performRESTQuery(query.toString());
+					if(restJsonResponse != null) {
+						processUsernameLookup(restJsonResponse, userMap);
+					} else {
+						//TODO Add logging
+						System.out.println("performRESTUserFileUploadQuery method returned null string");
+					}
+				}					
+				
+				fromIndex = fromIndex + batchSize; 
+				int tempToIndex = toIndex + batchSize;
+				if(chatterUserList.size() > tempToIndex) {
+					toIndex = tempToIndex;
+				} else {
+					toIndex = chatterUserList.size() ;
+				}
+			}	
+		}
+	}
+
 	private void retrieveMembershipsFromList(Collection<List<ChatterUser>> collection) throws ClientProtocolException, IOException, URISyntaxException {
 		chatterUserLookup.clear();//Clear lookup map as it will be reference in deletes
 		PropertyManager propMgr = PropertyManager.getInstance() ;
@@ -582,7 +707,11 @@ public class ChatterRESTWrapper {
 		  .append(propMgr.getStringProperty("saleforce_domain"));
 		
 		switch (chatterRESTUrl) {
-			case USER_PHOTO : {
+			case USER : {
+				sb.append(propMgr.getStringProperty("user_apex_rest_uri"));
+				break;
+			}
+			case CHATTER_USER_PHOTO : {
 				sb.append(propMgr.getStringProperty("user_rest_photo_uri")) ;
 				break;
 			}

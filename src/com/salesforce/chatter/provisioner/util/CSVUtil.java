@@ -101,4 +101,33 @@ public class CSVUtil {
 		}
 		return chatterGroupMembersMap;
 	}
+	
+	public static Map<String, ChatterUser> getChatterUserUpdatesFromCSV(String csvFilePath) {
+		Map<String, ChatterUser> chatterUserUpdateMap = new HashMap<String, ChatterUser>();
+		CsvReader aboutUsers = null;
+		try {
+			aboutUsers = new CsvReader(csvFilePath);
+			aboutUsers.readHeaders();
+			ChatterUser chatterUser;
+			String aboutMe;
+			while (aboutUsers.readRecord()) {
+				chatterUser = new ChatterUser();
+				aboutMe = aboutUsers.get("AboutMe");
+				chatterUser.setAboutMe(aboutMe);
+				chatterUser.setUserName(aboutUsers.get("Email"));
+				chatterUserUpdateMap.put(chatterUser.getUserName(), chatterUser);
+			}
+		} catch (FileNotFoundException fne) {
+			//TODO Add logging
+			fne.printStackTrace();
+		} catch (IOException ioe) {
+			//TODO Add logging
+			ioe.printStackTrace();
+		} finally {
+			if(aboutUsers != null) {
+				aboutUsers.close();
+			}
+		}
+		return chatterUserUpdateMap;
+	}	
 }

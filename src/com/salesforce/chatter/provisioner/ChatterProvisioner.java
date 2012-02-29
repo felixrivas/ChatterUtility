@@ -27,6 +27,7 @@ import com.salesforce.chatter.provisioner.rest.ChatterRESTWrapper.OperationType;
 
 public class ChatterProvisioner {
 
+	private static final String USER_UPDATE_ARG = "UserUpdate" ;
 	private static final String USER_PROFILE_PICTURE_ARG = "UserProfilePicture" ;
 	private static final String GROUP_PROFILE_PICTURE_ARG = "GroupPicture" ;
 	private static final String GROUP_MEMBER_PROVISION_ARG = "GroupMember" ;
@@ -46,6 +47,8 @@ public class ChatterProvisioner {
 				ChatterProvisioner cp = new ChatterProvisioner() ;
 				if (args[0].equalsIgnoreCase(USER_PROFILE_PICTURE_ARG)) {
 					cp.executeUserFileUploadProvisioner();	
+				} else if(args[0].equalsIgnoreCase(USER_UPDATE_ARG)) {
+					cp.executeUserUpdates() ;
 				} else if(args[0].equalsIgnoreCase(GROUP_PROFILE_PICTURE_ARG)) {
 					cp.executeGroupFileUploadProvisioner();	
 				} else if(args[0].equalsIgnoreCase(GROUP_MEMBER_PROVISION_ARG)) {
@@ -158,6 +161,12 @@ public class ChatterProvisioner {
 				
 			}
 		}
+	}
+	
+	private void executeUserUpdates() throws Exception {
+		PropertyManager propMgr = PropertyManager.getInstance();
+		String csvUserUpdatesFile = propMgr.getStringProperty("user_updates_csv_path");
+		ChatterRESTWrapper.getInstance().processUserUpdates(csvUserUpdatesFile);
 	}
 	
 	private List<File> getUserImageFiles() {

@@ -32,6 +32,7 @@ import java.util.List;
 public class ChatterUser {
 	private String userName = null;
 	private String userId = null;
+	private String aboutMe = null;
 	private File file = null;
 	private String groupId = null;
 	private String groupName = null;
@@ -51,6 +52,14 @@ public class ChatterUser {
 
 	public void setUserId(String userId) {
 		this.userId = userId;
+	}
+
+	public String getAboutMe() {
+		return aboutMe;
+	}
+
+	public void setAboutMe(String aboutMe) {
+		this.aboutMe = aboutMe;
 	}
 
 	public File getFile() {

@@ -18,6 +18,8 @@
 
 package com.salesforce.chatter.provisioner.util;
 
+import java.util.Map;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -66,5 +68,18 @@ public class JSONUtil {
 			System.err.println(jsonBody);
 		}
 		return fieldValue;
+	}
+	
+	public static String buildJSONString(Map<String, String> jsonValueMap) {
+		JSONObject json = new JSONObject();
+		try {
+			for(String key : jsonValueMap.keySet()) {
+				json.put(key, jsonValueMap.get(key));
+			}
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		return json.toString() ;
 	}
 }

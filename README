@@ -1,0 +1,126 @@
+Chatter Utility Application
+---------------------------
+
+Configuration
+-------------
+
+General
+-------
+
+/properties/chatter.properties
+	1. PROTOCOL
+	2. Salesforce Instance
+	3. Salesforce Domain
+	4. Salesforce Full Domain (can be used if myDomain is used)
+	5. Batch Size = Number of users that should be batched together for processing.  Increasing the number too high may have implications with the HTTP protocol (may exceed allowable query string length).
+
+Security
+--------
+	1. OAuth  User Pool Size
+		a.	With this setting you would need to setup the equivalent number of Remote Access Applications
+		b.	This is needed to overcome the Chatter REST API limits.
+		c.	Application implements a round-robin design to prevent the application from exceeding the API limit.
+		d.	As the Chatter REST API request is reached, application round-robins to the next Remote Access application setting.
+	2. REST API Limit set to 199 (limit is 200)
+
+Paths
+-----
+	1. Images Path for User Pictures
+	2. Images Path for Group Pictures
+	3. CSV Path for Group Membership Inserts
+	4. CSV Path for Group Membership deletes
+	5. CSV Path for User updates (current version supports updating User’s “About Me” attribute
+ 
+Expected Inputs
+---------------
+
+Image File Format Supported for User Profile & Group Pictures
+
+The following is a set of image file formats supported by the application: 
+	-	JPEG, PNG, GIF
+
+Image File Naming Convention for User Profile & Group Pictures
+
+Pictures for user profile picture should be as follows:
+	- [username].[extension] (e.g. johnsmith@abc.com.png)
+
+Pictures for group photos should be as follows:
+	- [group-name].[extension] (e.g. "IT Group.png")
+	
+Inserting New of Chatter Group Memberships
+------------------------------------------
+
+Prerequisites:
+-------------
+	1. CSV file with the following (sample data shown in the table below) needs to be provided.
+
+	/*******************************************/
+	*	Email,GroupName			    *
+	*	jsmith@abc.com,Sales Group	    *
+	*	jdoe@abc.com,Engineering Group	    *
+	/*******************************************/	
+	
+	Data added as email should match to User’s username.
+
+	2. Users  and Groups specified in the CSV should exist in Salesforce
+
+Deleting of Chatter Group Memberships
+-------------------------------------
+Prerequisites:
+-------------
+	1. CSV file with the following (sample data shown in the table below) needs to be provided.
+
+	/*******************************************/
+	*	Email,GroupName			    *
+	*	jsmith@abc.com,Sales Group	    *
+	*	jdoe@abc.com,Engineering Group	    *
+	/*******************************************/	
+
+	Data added as email should match to User’s username.
+
+	2. Users  and Groups specified in the CSV should exist in Salesforce
+
+Updates of User Attributes ("About Me") - Leverages Force.com REST API
+----------------------------------------------------------------------
+
+Prerequisites:
+-------------
+	1. CSV file with the following (sample data shown in the table below) needs to be provided.
+
+	/************************************************************************/
+	*	Email,AboutMe							 *
+	*	jsmith@abc.com,Account Executive with over 15 years experience.	 *
+	*	jdoe@abc.com,Software Engineer with 10 years experience in CRM.	 *
+	/************************************************************************/
+
+	Data added as email should match to User’s username.
+
+	2. Users specified in the CSV should exist in Salesforce
+
+Running the Chatter Utility
+---------------------------
+
+Packaging
+---------
+
+Package the project as a runnable JAR with all supporting libraries (e.g. /lib directory).
+
+User Photo Uploads
+------------------
+java com.salesforce.chatter.provisioner.ChatterProvisioner UserProfilePicture
+
+Group Photo Uploads
+-------------------
+java com.salesforce.chatter.provisioner.ChatterProvisioner GroupPicture
+
+Inserting New of Chatter Group Memberships
+------------------------------------------
+java com.salesforce.chatter.provisioner.ChatterProvisioner GroupMember I
+
+Deleting New of Chatter Group Memberships
+-----------------------------------------
+java com.salesforce.chatter.provisioner.ChatterProvisioner GroupMember D
+
+Update User "About Me" Attribute
+--------------------------------
+java com.salesforce.chatter.provisioner.ChatterProvisioner UserUpdate
